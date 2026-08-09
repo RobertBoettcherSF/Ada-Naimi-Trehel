@@ -76,6 +76,7 @@ package body Naimi_Trehel is
       Dest_Node : Valid_Node_ID;
       Req_Node  : Valid_Node_ID;
       Owner_Node : Valid_Node_ID;
+      Immediate_Owner : Valid_Node_ID;
    begin
       if Sys.Queue.Count = 0 then
          Success := False;
@@ -93,15 +94,8 @@ package body Naimi_Trehel is
             Put_Line ("DBG: handling Request_Msg; Dest=" & Integer'Image (Integer (Dest_Node)) & ", Req=" & Integer'Image (Integer (Req_Node)));
             Put_Line ("DBG: Dest.Owner(before)=" & Integer'Image (Integer (Sys.Nodes (Dest_Node).Owner)) & ", Dest.Token=" & Boolean'Image (Sys.Nodes (Dest_Node).Token_Present) & ", Dest.Req=" & Boolean'Image (Sys.Nodes (Dest_Node).Requesting) & ", Dest.Next=" & Integer'Image (Integer (Sys.Nodes (Dest_Node).Next_Node)));
 
-            -- Find the current owner representative for Dest_Node
-            Owner_Node := Dest_Node;
-            while Sys.Nodes (Owner_Node).Owner /= Owner_Node loop
-               Owner_Node := Sys.Nodes (Owner_Node).Owner;
-            end loop;
-            Put_Line ("DBG: representative Owner_Node=" & Integer'Image (Integer (Owner_Node)) & ", Owner.Token=" & Boolean'Image (Sys.Nodes (Owner_Node).Token_Present) & ", Owner.Req=" & Boolean'Image (Sys.Nodes (Owner_Node).Requesting) & ", Owner.Next(before)=" & Integer'Image (Integer (Sys.Nodes (Owner_Node).Next_Node)));
-
-            if Owner_Node = Dest_Node then
-               -- Destination considers itself the root/owner: handle locally
+            -- If the destination considers itself the root, handle locally
+            if Sys.Nodes (Dest_Node).Owner = Dest_Node then
                if Sys.Nodes (Dest_Node).Token_Present and then not Sys.Nodes (Dest_Node).Requesting then
                   -- Give up token immediately
                   Sys.Nodes (Dest_Node).Token_Present := False;
@@ -119,28 +113,17 @@ package body Naimi_Trehel is
                end if;
 
             else
-               -- Representative is different: operate on Owner_Node (the real owner)
-               if Sys.Nodes (Owner_Node).Token_Present and then not Sys.Nodes (Owner_Node).Requesting then
-                  -- Owner can forward token immediately
-                  Sys.Nodes (Owner_Node).Token_Present := False;
-                  Enqueue (Sys.Queue, (Kind => Token_Msg, Source => Owner_Node, Dest => Req_Node));
-                  Put_Line ("DBG: Enqueued Token_Msg from Owner_Node=" & Integer'Image (Integer (Owner_Node)) & ", to Req=" & Integer'Image (Integer (Req_Node)) & ", QueueCount=" & Natural'Image (Sys.Queue.Count));
-               elsif Sys.Nodes (Owner_Node).Token_Present and Sys.Nodes (Owner_Node).Requesting then
-                  -- Owner is in CS; set its Next_Node so it will pass token later
-                  Sys.Nodes (Owner_Node).Next_Node := Node_ID(Req_Node);
-                  Put_Line ("DBG: Set Next_Node on Owner_Node=" & Integer'Image (Integer (Owner_Node)) & " to " & Integer'Image (Integer (Req_Node)));
-               else
-                  -- Owner does not hold token: forward one hop to owner by enqueuing a request
-                  Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Owner_Node));
-                  Put_Line ("DBG: Enqueued Request_Msg forward: Src=" & Integer'Image (Integer (Req_Node)) & ", Dest=" & Integer'Image (Integer (Owner_Node)) & ", QueueCount=" & Natural'Image (Sys.Queue.Count));
-               end if;
+               -- Destination is not root: forward one hop to the immediate owner
+               Immediate_Owner := Sys.Nodes (Dest_Node).Owner;
+               Put_Line ("DBG: Immediate_Owner=" & Integer'Image (Integer (Immediate_Owner)));
 
-               -- Path compression: make the original destination point to the requester (but do not overwrite
-               -- the representative's owner; only compress the immediate Dest)
-               if Owner_Node /= Dest_Node then
-                  Sys.Nodes (Dest_Node).Owner := Req_Node;
-                  Put_Line ("DBG: Path compression: Dest.Owner set to " & Integer'Image (Integer (Req_Node)));
-               end if;
+               -- Path compression: make the original destination point to the requester immediately
+               Sys.Nodes (Dest_Node).Owner := Req_Node;
+               Put_Line ("DBG: Path compression (forwarding): Dest.Owner set to " & Integer'Image (Integer (Req_Node)));
+
+               -- Forward the request one hop to the immediate owner
+               Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Immediate_Owner));
+               Put_Line ("DBG: Enqueued Request_Msg forward: Src=" & Integer'Image (Integer (Req_Node)) & ", Dest=" & Integer'Image (Integer (Immediate_Owner)) & ", QueueCount=" & Natural'Image (Sys.Queue.Count));
             end if;
             
          when Token_Msg =>
