@@ -74,6 +74,7 @@ package body Naimi_Trehel is
       Dest_Node : Valid_Node_ID;
       Req_Node  : Valid_Node_ID;
       Immediate_Owner : Valid_Node_ID;
+      Owner_Node : Valid_Node_ID;
    begin
       if Sys.Queue.Count = 0 then
          Success := False;
@@ -87,9 +88,9 @@ package body Naimi_Trehel is
          when Request_Msg =>
             Dest_Node := M.Dest;
             Req_Node  := M.Source;
-            
+
+            -- If the destination considers itself the root, handle locally
             if Sys.Nodes (Dest_Node).Owner = Dest_Node then
-               -- Node believes it is the root of the tree
                if Sys.Nodes (Dest_Node).Token_Present and then not Sys.Nodes (Dest_Node).Requesting then
                   -- Give up token immediately
                   Sys.Nodes (Dest_Node).Token_Present := False;
@@ -98,18 +99,39 @@ package body Naimi_Trehel is
                   -- Enqueue the requestor if currently using or waiting for the token
                   Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
                end if;
+
             else
-               -- Forward one hop: capture immediate owner, compress path, then enqueue a single request to that owner
-               Immediate_Owner := Sys.Nodes (Dest_Node).Owner;
+               -- Destination is not root: find the current owner representative (walk up the owner chain)
+               Owner_Node := Dest_Node;
+               while Sys.Nodes (Owner_Node).Owner /= Owner_Node loop
+                  Owner_Node := Sys.Nodes (Owner_Node).Owner;
+               end loop;
 
-               -- Path compression: make the original destination point to the requester immediately
-               Sys.Nodes (Dest_Node).Owner := Req_Node;
+               -- If the owner currently holds the token, handle it immediately (either forward token or queue)
+               if Sys.Nodes (Owner_Node).Token_Present then
+                  if not Sys.Nodes (Owner_Node).Requesting then
+                     -- Owner can forward token immediately
+                     Sys.Nodes (Owner_Node).Token_Present := False;
+                     Enqueue (Sys.Queue, (Kind => Token_Msg, Source => Owner_Node, Dest => Req_Node));
+                  else
+                     -- Owner is in CS; set its Next_Node so it will pass token later
+                     Sys.Nodes (Owner_Node).Next_Node := Node_ID(Req_Node);
+                  end if;
 
-               -- Forward the request one hop to the immediate owner
-               Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Immediate_Owner));
+                  -- Path compression: make the original destination point to requester
+                  Sys.Nodes (Dest_Node).Owner := Req_Node;
+
+               else
+                  -- Owner does not hold token: forward one hop to immediate owner (no duplicate forwarding)
+                  Immediate_Owner := Sys.Nodes (Dest_Node).Owner;
+
+                  -- Path compression: make the original destination point to requester immediately
+                  Sys.Nodes (Dest_Node).Owner := Req_Node;
+
+                  -- Forward the request one hop to the immediate owner
+                  Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Immediate_Owner));
+               end if;
             end if;
-            
-            -- (Owner compression already applied above for forwarded case)
             
          when Token_Msg =>
             Sys.Nodes (M.Dest).Token_Present := True;
