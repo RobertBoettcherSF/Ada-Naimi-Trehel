@@ -1,3 +1,5 @@
+with Ada.Text_IO; use Ada.Text_IO;
+
 -- naimi_trehel.adb
 package body Naimi_Trehel is
 
@@ -89,29 +91,38 @@ package body Naimi_Trehel is
             Dest_Node := M.Dest;
             Req_Node  := M.Source;
 
+            Put_Line ("DBG: handling Request_Msg; Dest=" & Integer'Image (Integer (Dest_Node)) & ", Req=" & Integer'Image (Integer (Req_Node)));
+            Put_Line ("DBG: Dest.Owner(before)=" & Integer'Image (Integer (Sys.Nodes (Dest_Node).Owner)) & ", Dest.Token=" & Boolean'Image (Sys.Nodes (Dest_Node).Token_Present) & ", Dest.Req=" & Boolean'Image (Sys.Nodes (Dest_Node).Requesting) & ", Dest.Next=" & Integer'Image (Integer (Sys.Nodes (Dest_Node).Next_Node)));
+
             -- If the destination considers itself the root, handle locally
             if Sys.Nodes (Dest_Node).Owner = Dest_Node then
                if Sys.Nodes (Dest_Node).Token_Present and then not Sys.Nodes (Dest_Node).Requesting then
                   -- Give up token immediately
                   Sys.Nodes (Dest_Node).Token_Present := False;
                   Enqueue (Sys.Queue, (Kind => Token_Msg, Source => Dest_Node, Dest => Req_Node));
+                  Put_Line ("DBG: Enqueued Token_Msg: Src=" & Integer'Image (Integer (Dest_Node)) & ", Dest=" & Integer'Image (Integer (Req_Node)) & ", QueueCount=" & Natural'Image (Sys.Queue.Count));
                else
                   -- Enqueue the requestor if currently using or waiting for the token
                   Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
+                  Put_Line ("DBG: Set Next_Node on Dest=" & Integer'Image (Integer (Dest_Node)) & " to " & Integer'Image (Integer (Req_Node)));
                end if;
 
                -- Path compression: make the original destination point to the requester
                Sys.Nodes (Dest_Node).Owner := Req_Node;
+               Put_Line ("DBG: Path compression (root case): Dest.Owner set to " & Integer'Image (Integer (Req_Node)));
 
             else
                -- Destination is not root: forward one hop to the immediate owner
                Immediate_Owner := Sys.Nodes (Dest_Node).Owner;
+               Put_Line ("DBG: Immediate_Owner=" & Integer'Image (Integer (Immediate_Owner)));
 
                -- Path compression: make the original destination point to the requester immediately
                Sys.Nodes (Dest_Node).Owner := Req_Node;
+               Put_Line ("DBG: Path compression (forwarding): Dest.Owner set to " & Integer'Image (Integer (Req_Node)));
 
                -- Forward the request one hop to the immediate owner
                Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Immediate_Owner));
+               Put_Line ("DBG: Enqueued Request_Msg forward: Src=" & Integer'Image (Integer (Req_Node)) & ", Dest=" & Integer'Image (Integer (Immediate_Owner)) & ", QueueCount=" & Natural'Image (Sys.Queue.Count));
             end if;
             
          when Token_Msg =>
