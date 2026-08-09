@@ -97,6 +97,10 @@ package body Naimi_Trehel is
                   -- Enqueue the requestor if currently using or waiting for the token
                   Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
                end if;
+            elsif Sys.Nodes (Dest_Node).Token_Present then
+               -- In case the node actually holds the token but does not consider itself the root,
+               -- still queue the requester so the token will be passed after release.
+               Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
             else
                -- Transparently forward the request up the dynamic tree
                Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Sys.Nodes (Dest_Node).Owner));
