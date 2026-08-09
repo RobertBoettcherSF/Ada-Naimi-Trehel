@@ -73,7 +73,6 @@ package body Naimi_Trehel is
       M : Message;
       Dest_Node : Valid_Node_ID;
       Req_Node  : Valid_Node_ID;
-      Owner_Node : Valid_Node_ID;
       Immediate_Owner : Valid_Node_ID;
    begin
       if Sys.Queue.Count = 0 then
@@ -100,13 +99,17 @@ package body Naimi_Trehel is
                   Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
                end if;
             else
-               -- Not the root: forward the request one hop to the immediate owner
+               -- Forward one hop: capture immediate owner, compress path, then enqueue a single request to that owner
                Immediate_Owner := Sys.Nodes (Dest_Node).Owner;
+
+               -- Path compression: make the original destination point to the requester immediately
+               Sys.Nodes (Dest_Node).Owner := Req_Node;
+
+               -- Forward the request one hop to the immediate owner
                Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Immediate_Owner));
             end if;
             
-            -- Point local owner flag to requestor to collapse path (O(log n) optimization)
-            Sys.Nodes (Dest_Node).Owner := Req_Node;
+            -- (Owner compression already applied above for forwarded case)
             
          when Token_Msg =>
             Sys.Nodes (M.Dest).Token_Present := True;
