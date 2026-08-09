@@ -74,6 +74,7 @@ package body Naimi_Trehel is
       Dest_Node : Valid_Node_ID;
       Req_Node  : Valid_Node_ID;
       Owner_Node : Valid_Node_ID;
+      Immediate_Owner : Valid_Node_ID;
    begin
       if Sys.Queue.Count = 0 then
          Success := False;
@@ -99,20 +100,9 @@ package body Naimi_Trehel is
                   Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
                end if;
             else
-               -- Not the root: walk up to the current owner representative
-               Owner_Node := Dest_Node;
-               while Sys.Nodes (Owner_Node).Owner /= Owner_Node loop
-                  Owner_Node := Sys.Nodes (Owner_Node).Owner;
-               end loop;
-
-               if Sys.Nodes (Owner_Node).Token_Present and then not Sys.Nodes (Owner_Node).Requesting then
-                  -- Owner has token and can forward immediately
-                  Sys.Nodes (Owner_Node).Token_Present := False;
-                  Enqueue (Sys.Queue, (Kind => Token_Msg, Source => Owner_Node, Dest => Req_Node));
-               else
-                  -- Queue the requester at the owner node so token will be passed later
-                  Sys.Nodes (Owner_Node).Next_Node := Node_ID(Req_Node);
-               end if;
+               -- Not the root: forward the request one hop to the immediate owner
+               Immediate_Owner := Sys.Nodes (Dest_Node).Owner;
+               Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Immediate_Owner));
             end if;
             
             -- Point local owner flag to requestor to collapse path (O(log n) optimization)
