@@ -1,4 +1,4 @@
--- src/naimi_trehel.adb
+-- naimi_trehel.adb
 package body Naimi_Trehel is
 
    procedure Enqueue (Q : in out Message_Queue; M : Message) is
