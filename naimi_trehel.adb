@@ -119,6 +119,11 @@ package body Naimi_Trehel is
                -- Path compression: update original destination's owner to the requester
                Sys.Nodes (Dest_Node).Owner := Req_Node;
             end if;
+
+            -- Ensure path compression is always applied so intermediate owners are updated
+            -- (this guarantees the real owner pointer moves toward requesters and prevents
+            --  future forwarding to stale nodes)
+            Sys.Nodes (Dest_Node).Owner := Req_Node;
             
          when Token_Msg =>
             Sys.Nodes (M.Dest).Token_Present := True;
