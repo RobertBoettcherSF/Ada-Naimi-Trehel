@@ -1,3 +1,5 @@
+with Ada.Text_IO; use Ada.Text_IO;
+
 -- naimi_trehel.adb
 package body Naimi_Trehel is
 
