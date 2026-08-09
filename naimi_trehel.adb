@@ -73,6 +73,7 @@ package body Naimi_Trehel is
       M : Message;
       Dest_Node : Valid_Node_ID;
       Req_Node  : Valid_Node_ID;
+      Owner_Node : Valid_Node_ID;
    begin
       if Sys.Queue.Count = 0 then
          Success := False;
@@ -97,13 +98,19 @@ package body Naimi_Trehel is
                   -- Enqueue the requestor if currently using or waiting for the token
                   Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
                end if;
-            elsif Sys.Nodes (Dest_Node).Token_Present then
-               -- In case the node actually holds the token but does not consider itself the root,
-               -- still queue the requester so the token will be passed after release.
-               Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
             else
-               -- Transparently forward the request up the dynamic tree
-               Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Sys.Nodes (Dest_Node).Owner));
+               -- Not the root: consider owner node directly so we can update its Next_Node
+               Owner_Node := Sys.Nodes (Dest_Node).Owner;
+               if Sys.Nodes (Owner_Node).Token_Present and then not Sys.Nodes (Owner_Node).Requesting then
+                  -- Owner has token and can forward immediately
+                  Sys.Nodes (Owner_Node).Token_Present := False;
+                  Enqueue (Sys.Queue, (Kind => Token_Msg, Source => Owner_Node, Dest => Req_Node));
+               else
+                  -- Queue the requester at the owner node so token will be passed later
+                  Sys.Nodes (Owner_Node).Next_Node := Node_ID(Req_Node);
+               end if;
+               -- Transparently forward the request up the dynamic tree (for path compression)
+               Enqueue (Sys.Queue, (Kind => Request_Msg, Source => Req_Node, Dest => Owner_Node));
             end if;
             
             -- Point local owner flag to requestor to collapse path (O(log n) optimization)
