@@ -107,6 +107,11 @@ package body Naimi_Trehel is
                   Sys.Nodes (Dest_Node).Token_Present := False;
                   Enqueue (Sys.Queue, (Kind => Token_Msg, Source => Dest_Node, Dest => Req_Node));
                   Put_Line ("DBG: Enqueued Token_Msg: Src=" & Integer'Image (Integer (Dest_Node)) & ", Dest=" & Integer'Image (Integer (Req_Node)) & ", QueueCount=" & Natural'Image (Sys.Queue.Count));
+
+                  -- Path compression: update this root's owner to the requester so future requests go toward
+                  -- the actual token holder instead of remaining at this stale root.
+                  Sys.Nodes (Dest_Node).Owner := Req_Node;
+                  Put_Line ("DBG: Path compression (root gave token): Dest.Owner set to " & Integer'Image (Integer (Req_Node)));
                else
                   -- Enqueue the requestor if currently using or waiting for the token
                   Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
@@ -130,9 +135,12 @@ package body Naimi_Trehel is
                   Put_Line ("DBG: Enqueued Request_Msg forward: Src=" & Integer'Image (Integer (Req_Node)) & ", Dest=" & Integer'Image (Integer (Owner_Node)) & ", QueueCount=" & Natural'Image (Sys.Queue.Count));
                end if;
 
-               -- Path compression: make the original destination point to the requester
-               Sys.Nodes (Dest_Node).Owner := Req_Node;
-               Put_Line ("DBG: Path compression: Dest.Owner set to " & Integer'Image (Integer (Req_Node)));
+               -- Path compression: make the original destination point to the requester (but do not overwrite
+               -- the representative's owner; only compress the immediate Dest)
+               if Owner_Node /= Dest_Node then
+                  Sys.Nodes (Dest_Node).Owner := Req_Node;
+                  Put_Line ("DBG: Path compression: Dest.Owner set to " & Integer'Image (Integer (Req_Node)));
+               end if;
             end if;
             
          when Token_Msg =>
