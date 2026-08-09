@@ -74,16 +74,7 @@ begin
    Put_Line ("  7.1 Node 2 in CS, Node 3 requests token");
    Request_Critical_Section (Sys, 3);
    Process_Next_Message (Sys, Success);
-
-   -- DEBUG: dump state to help diagnose Next_Node not being set
-   Put_Line ("DEBUG: before TEST 7 checks");
-   Put_Line ("  Node 1: Owner=" & Integer'Image (Integer (Sys.Nodes(1).Owner)) & ", Token=" & Boolean'Image (Sys.Nodes(1).Token_Present) & ", Req=" & Boolean'Image (Sys.Nodes(1).Requesting) & ", Next=" & Integer'Image (Integer (Sys.Nodes(1).Next_Node)));
-   Put_Line ("  Node 2: Owner=" & Integer'Image (Integer (Sys.Nodes(2).Owner)) & ", Token=" & Boolean'Image (Sys.Nodes(2).Token_Present) & ", Req=" & Boolean'Image (Sys.Nodes(2).Requesting) & ", Next=" & Integer'Image (Integer (Sys.Nodes(2).Next_Node)));
-   Put_Line ("  Node 3: Owner=" & Integer'Image (Integer (Sys.Nodes(3).Owner)) & ", Token=" & Boolean'Image (Sys.Nodes(3).Token_Present) & ", Req=" & Boolean'Image (Sys.Nodes(3).Requesting) & ", Next=" & Integer'Image (Integer (Sys.Nodes(3).Next_Node)));
-   Put_Line ("  Queue Count: " & Natural'Image (Pending_Messages (Sys)));
-   if Pending_Messages (Sys) > 0 then
-      Put_Line ("  First Msg: Kind=" & Message_Kind'Image(Sys.Queue.Items(1).Kind) & ", Src=" & Integer'Image (Integer (Sys.Queue.Items(1).Source)) & ", Dest=" & Integer'Image (Integer (Sys.Queue.Items(1).Dest)));
-   end if;
+   Process_Next_Message (Sys, Success);
 
    Put_Line ("  7.2 Assert Node 2 queues Node 3 (Next_Node updated)");
    Assert (Sys.Nodes(2).Next_Node = 3, "Node 2 should set Next_Node to 3");

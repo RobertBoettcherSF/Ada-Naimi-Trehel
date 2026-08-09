@@ -75,7 +75,6 @@ package body Naimi_Trehel is
       M : Message;
       Dest_Node : Valid_Node_ID;
       Req_Node  : Valid_Node_ID;
-      Owner_Node : Valid_Node_ID;
       Immediate_Owner : Valid_Node_ID;
    begin
       if Sys.Queue.Count = 0 then
@@ -109,6 +108,9 @@ package body Naimi_Trehel is
                else
                   -- Enqueue the requestor if currently using or waiting for the token
                   Sys.Nodes (Dest_Node).Next_Node := Node_ID(Req_Node);
+                  -- Path compression: update this root's owner to the requester
+                  Sys.Nodes (Dest_Node).Owner := Req_Node;
+                  Put_Line ("DBG: Path compression (root in CS): Dest.Owner set to " & Integer'Image (Integer (Req_Node)));
                   Put_Line ("DBG: Set Next_Node on Dest=" & Integer'Image (Integer (Dest_Node)) & " to " & Integer'Image (Integer (Req_Node)));
                end if;
 
